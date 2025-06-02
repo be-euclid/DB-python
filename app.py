@@ -113,17 +113,19 @@ def get_party_counts(df):
     counts = party_data.value_counts()
     return counts
 
+def normalize_party(x):
+    if pd.isna(x) or str(x).strip() == '' or str(x).strip().lower() in ['non-party', 'non party', 'nonparty']:
+        return 'Non-Party'
+    return str(x).strip()
+
 def get_party_counts_and_col(df):
     party_cols = [col for col in df.columns if 'party membership' in str(col).lower()]
     if not party_cols:
         return None, None
     party_col = party_cols[0]
-    # None, NaN, 빈 문자열, 공백 등은 모두 Non-Party로 대체
-    party_data = df[party_col].replace([None, np.nan, '', ' '], 'Non-Party')
-    party_data = party_data.fillna('Non-Party')
-    party_data = party_data.apply(lambda x: 'Non-Party' if str(x).strip() == '' else x)
+    party_data = df[party_col].apply(normalize_party)
     counts = party_data.value_counts()
-    return counts, party_col
+    return counts, party_col, party_data
 
 def pie_chart_with_counts(counts, title, total):
     labels = [f"{idx} ({cnt})" for idx, cnt in zip(counts.index, counts.values)]
@@ -150,27 +152,31 @@ if uploaded_file:
         years = sorted(df_all['Year(sheet)'].unique())
         selected_year = st.selectbox("연도를 선택하세요", years, key="party_year")
         year_df = df_all[df_all['Year(sheet)'] == selected_year]
-        counts, party_col = get_party_counts_and_col(year_df)
+        # None/공백(Non-Party) 숨기기 체크박스
+        hide_nonparty = st.checkbox("'Non-Party' (None/공백 포함) 숨기기")
+        counts, party_col, party_data = get_party_counts_and_col(year_df)
         if counts is not None and not counts.empty:
             st.subheader(f"{selected_year}년 Party Membership별 인원 분포")
             party_df = counts.rename('인원수').reset_index().rename(columns={'index': 'Party Membership'})
-            # Party Membership 항목 선택
-            selected_party = st.radio("Party Membership을 선택하세요", party_df['Party Membership'])
-            st.dataframe(party_df)
-            # 선택된 Party Membership을 가진 사람 목록 출력
-            filtered_df = year_df.copy()
-            filtered_df[party_col] = filtered_df[party_col].replace([None, np.nan, '', ' '], 'Non-Party')
-            filtered_df[party_col] = filtered_df[party_col].fillna('Non-Party')
-            filtered_df[party_col] = filtered_df[party_col].apply(lambda x: 'Non-Party' if str(x).strip() == '' else x)
-            result = filtered_df[filtered_df[party_col] == selected_party]
-            if not result.empty:
-                result = reorder_columns(result)
-                st.success(f"{selected_party} Party Membership을 가진 인물 목록 ({len(result)}명):")
-                st.dataframe(result)
+            if hide_nonparty:
+                party_df = party_df[party_df['Party Membership'].str.lower() != 'non-party']
+                if not party_df.empty:
+                    selected_party = st.radio("Party Membership을 선택하세요", party_df['Party Membership'])
+                    st.dataframe(party_df)
+                    filtered_df = year_df.copy()
+                    filtered_df[party_col] = party_data  # 정규화된 값으로 대체
+                    result = filtered_df[filtered_df[party_col].str.lower() == selected_party.strip().lower()]
+                    if not result.empty:
+                        result = reorder_columns(result)
+                        st.success(f"{selected_party} Party Membership을 가진 인물 목록 ({len(result)}명):")
+                        st.dataframe(result)
+                    else:
+                        st.warning("해당 Party Membership을 가진 인물이 없습니다.")
+                else:
+                    st.warning("표시할 Party Membership이 없습니다.")
             else:
-                st.warning("해당 Party Membership을 가진 인물이 없습니다.")
-        else:
-            st.warning("Party Membership 컬럼이 없거나 데이터가 없습니다.")
+                st.warning("Party Membership 컬럼이 없거나 데이터가 없습니다.")
+                
     elif menu == "이름 검색":
         name_input = st.text_input("이름을 입력하세요(예: Nemchinov Vasily Sergeevich)")
         hide_none = st.checkbox("None/빈값 컬럼 숨기기")
@@ -184,6 +190,7 @@ if uploaded_file:
                 st.dataframe(result)
             else:
                 st.warning("해당 이름을 찾을 수 없습니다.")
+                
     elif menu == "연도별 직위 분포":
         years = sorted(df_all['Year(sheet)'].unique())
         selected_year = st.selectbox("연도를 선택하세요", years)
