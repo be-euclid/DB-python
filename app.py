@@ -61,6 +61,14 @@ def match_names(df, name_input):
     mask = df[name_col].apply(is_match)
     return df[mask]
 
+def reorder_columns(df):
+    # 이름 컬럼 찾기
+    name_col = [col for col in df.columns if 'name' in str(col).lower()]
+    year_col = [col for col in df.columns if 'year(sheet)' in str(col).lower()]
+    other_cols = [col for col in df.columns if col not in name_col + year_col]
+    new_order = name_col + year_col + other_cols
+    return df[new_order]
+
 st.title("DB 이름 검색기")
 
 uploaded_file = st.file_uploader("엑셀 파일(.xlsx) 업로드", type="xlsx")
@@ -70,6 +78,7 @@ if uploaded_file:
     if name_input:
         result = match_names(df_all, name_input)
         if not result.empty:
+            result = reorder_columns(result)
             st.success(f"{name_input} 검색 결과 :")
             st.dataframe(result)
         else:
