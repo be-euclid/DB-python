@@ -3,5 +3,3 @@ pandas
 openpyxl
 matplotlib
 numpy
-#한글 폰트
-nanum-fonts
