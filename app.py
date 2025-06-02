@@ -160,22 +160,22 @@ if uploaded_file:
             party_df = counts.rename('인원수').reset_index().rename(columns={'index': 'Party Membership'})
             if hide_nonparty:
                 party_df = party_df[party_df['Party Membership'].str.lower() != 'non-party']
-                if not party_df.empty:
-                    selected_party = st.radio("Party Membership을 선택하세요", party_df['Party Membership'])
-                    st.dataframe(party_df)
-                    filtered_df = year_df.copy()
-                    filtered_df[party_col] = party_data  # 정규화된 값으로 대체
-                    result = filtered_df[filtered_df[party_col].str.lower() == selected_party.strip().lower()]
-                    if not result.empty:
-                        result = reorder_columns(result)
-                        st.success(f"{selected_party} Party Membership을 가진 인물 목록 ({len(result)}명):")
-                        st.dataframe(result)
-                    else:
-                        st.warning("해당 Party Membership을 가진 인물이 없습니다.")
+            if not party_df.empty:
+                selected_party = st.radio("Party Membership을 선택하세요", party_df['Party Membership'])
+                st.dataframe(party_df)
+                filtered_df = year_df.copy()
+                filtered_df[party_col] = party_data  # 정규화된 값으로 대체
+                result = filtered_df[filtered_df[party_col].str.lower() == selected_party.strip().lower()]
+                if not result.empty:
+                    result = reorder_columns(result)
+                    st.success(f"{selected_party} Party Membership을 가진 인물 목록 ({len(result)}명):")
+                    st.dataframe(result)
                 else:
-                    st.warning("표시할 Party Membership이 없습니다.")
+                    st.warning("해당 Party Membership을 가진 인물이 없습니다.")
             else:
-                st.warning("Party Membership 컬럼이 없거나 데이터가 없습니다.")
+                st.warning("표시할 Party Membership이 없습니다.")
+        else:
+            st.warning("Party Membership 컬럼이 없거나 데이터가 없습니다.")
                 
     elif menu == "이름 검색":
         name_input = st.text_input("이름을 입력하세요(예: Nemchinov Vasily Sergeevich)")
