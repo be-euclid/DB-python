@@ -140,7 +140,7 @@ def pie_chart_with_counts(counts, title, total):
     for autotext in autotexts:
         autotext.set_fontsize(9)
     ax.axis('equal')
-    plt.figtext(0.98, 0.02, f"총 인원: {total}명", ha='right', va='bottom', fontsize=10, color='gray')
+    plt.figtext(0.98, 0.02, f"All: {total}", ha='right', va='bottom', fontsize=10, color='gray')
     plt.title(title, fontsize=13)
     return fig
 
@@ -208,7 +208,7 @@ if uploaded_file:
         if counts is not None and not counts.empty:
             st.subheader(f"{selected_year}년 Position/Title별 인원 분포 (상위 7개 + Others)")
             total = int(counts.sum())
-            fig = pie_chart_with_counts(counts, f"{selected_year}년 Position/Title 분포", total)
+            fig = pie_chart_with_counts(counts, f"{selected_year} Position/Title", total)
             st.pyplot(fig)
             st.dataframe(counts.rename('인원수'))
         else:
