@@ -62,12 +62,24 @@ def match_names(df, name_input):
     return df[mask]
 
 def reorder_columns(df):
-    # 이름 컬럼 찾기
-    name_col = [col for col in df.columns if 'name' in str(col).lower()]
+    # 이름 컬럼 찾기 (대소문자 구분 없이)
+    name_cols = [col for col in df.columns if 'name' in str(col).lower()]
     year_col = [col for col in df.columns if 'year(sheet)' in str(col).lower()]
-    other_cols = [col for col in df.columns if col not in name_col + year_col]
-    new_order = name_col + year_col + other_cols
-    return df[new_order]
+    if not name_cols or not year_col:
+        return df  # 못 찾으면 원본 반환
+
+    name_col = name_cols[0]
+    year_col = year_col[0]
+
+    # 이름 컬럼의 위치 찾기
+    cols = list(df.columns)
+    name_idx = cols.index(name_col)
+
+    # 이름 컬럼까지 앞쪽, 그 뒤에 year_col, 나머지
+    # (year_col이 이미 있으면 먼저 제거)
+    cols_wo_year = [c for c in cols if c != year_col]
+    new_cols = cols_wo_year[:name_idx+1] + [year_col] + cols_wo_year[name_idx+1:]
+    return df[new_cols]
 
 st.title("DB 이름 검색기")
 
