@@ -3,13 +3,13 @@ import pandas as pd
 import re
 
 @st.cache_data
-def load_all_data(file_path):
-    xls = pd.ExcelFile(file_path)
+def load_all_data(uploaded_file):
+    xls = pd.ExcelFile(uploaded_file)
     sheet_names = xls.sheet_names
     df_list = []
     for sheet in sheet_names:
         try:
-            df = pd.read_excel(file_path, sheet_name=sheet)
+            df = pd.read_excel(xls, sheet_name=sheet)
             df['Year(sheet)'] = sheet
             df_list.append(df)
         except Exception:
