@@ -10,9 +10,9 @@ import platform
 def set_korean_font():
     if platform.system() == 'Windows':
         matplotlib.rc('font', family='Malgun Gothic')
-    elif platform.system() == 'Darwin':  # macOS
+    elif platform.system() == 'Darwin':
         matplotlib.rc('font', family='AppleGothic')
-    else:  # Linux/Streamlit Cloud
+    else:
         matplotlib.rc('font', family='NanumGothic')
     matplotlib.rcParams['axes.unicode_minus'] = False
 
@@ -152,17 +152,26 @@ if uploaded_file:
         years = sorted(df_all['Year(sheet)'].unique())
         selected_year = st.selectbox("연도를 선택하세요", years, key="party_year")
         year_df = df_all[df_all['Year(sheet)'] == selected_year]
-        # None/공백(Non-Party) 숨기기 체크박스
         hide_nonparty = st.checkbox("'Non-Party' (None/공백 포함) 숨기기")
         counts, party_col, party_data = get_party_counts_and_col(year_df)
         if counts is not None and not counts.empty:
             st.subheader(f"{selected_year}년 Party Membership별 인원 분포")
             party_df = counts.rename('인원수').reset_index().rename(columns={'index': 'Party Membership'})
+            # 'Non-Party' 숨기기
             if hide_nonparty:
                 party_df = party_df[party_df['Party Membership'].str.lower() != 'non-party']
-            if not party_df.empty:
-                selected_party = st.radio("Party Membership을 선택하세요", party_df['Party Membership'])
-                st.dataframe(party_df)
+            # 맨 아래에 All 행 추가
+            total = party_df['인원수'].sum()
+            party_df = pd.concat(
+                [party_df, pd.DataFrame([{'Party Membership': 'All', '인원수': total}])],
+                ignore_index=True
+            )
+            st.dataframe(party_df, use_container_width=True)
+            # All행을 제외한 Party Membership만 선택 가능
+            selectable = party_df[party_df['Party Membership'] != 'All']['Party Membership']
+            if not selectable.empty:
+                selected_party = st.radio("Party Membership을 선택하세요", selectable)
+                # 선택된 Party Membership을 가진 사람 목록 출력
                 filtered_df = year_df.copy()
                 filtered_df[party_col] = party_data  # 정규화된 값으로 대체
                 result = filtered_df[filtered_df[party_col].str.lower() == selected_party.strip().lower()]
