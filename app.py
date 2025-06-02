@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+import matplotlib.pyplot as plt
 
 @st.cache_data
 def load_all_data(uploaded_file):
@@ -67,24 +68,48 @@ def reorder_columns(df):
     return df[new_cols]
 
 def drop_all_none_columns(df):
-    # 모든 값이 NaN, None, ''(빈 문자열)인 컬럼만 제거
     df = df.dropna(axis=1, how='all')
     return df.loc[:, ~(df == '').all()]
 
-st.title("DB 이름 검색기")
+def get_position_counts(df):
+    pos_cols = [col for col in df.columns if 'position/title' in str(col).lower()]
+    if not pos_cols:
+        return None
+    pos_col = pos_cols[0]
+    counts = df[pos_col].value_counts(dropna=True)
+    return counts
+
+st.title("DB 검색 및 통계 대시보드")
 
 uploaded_file = st.file_uploader("엑셀 파일(.xlsx) 업로드", type="xlsx")
 if uploaded_file:
     df_all = load_all_data(uploaded_file)
-    name_input = st.text_input("이름을 입력하세요(예: Nemchinov Vasily Sergeevich)")
-    hide_none = st.checkbox("None/빈값 컬럼 숨기기")
-    if name_input:
-        result = match_names(df_all, name_input)
-        if not result.empty:
-            result = reorder_columns(result)
-            if hide_none:
-                result = drop_all_none_columns(result)
-            st.success(f"{name_input} 검색 결과 :")
-            st.dataframe(result)
+    menu = st.sidebar.radio("메뉴 선택", ["이름 검색", "연도별 직위 분포"])
+    if menu == "이름 검색":
+        name_input = st.text_input("이름을 입력하세요(예: Nemchinov Vasily Sergeevich)")
+        hide_none = st.checkbox("None/빈값 컬럼 숨기기")
+        if name_input:
+            result = match_names(df_all, name_input)
+            if not result.empty:
+                result = reorder_columns(result)
+                if hide_none:
+                    result = drop_all_none_columns(result)
+                st.success(f"{name_input} 검색 결과 :")
+                st.dataframe(result)
+            else:
+                st.warning("해당 이름을 찾을 수 없습니다.")
+    elif menu == "연도별 직위 분포":
+        years = sorted(df_all['Year(sheet)'].unique())
+        selected_year = st.selectbox("연도를 선택하세요", years)
+        year_df = df_all[df_all['Year(sheet)'] == selected_year]
+        counts = get_position_counts(year_df)
+        if counts is not None and not counts.empty:
+            st.subheader(f"{selected_year}년 Position/Title별 인원 분포")
+            fig, ax = plt.subplots()
+            ax.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=90, counterclock=False)
+            ax.axis('equal')
+            st.pyplot(fig)
+            st.write(f"총 인원: {int(counts.sum())}명")
+            st.dataframe(counts.rename('인원수'))
         else:
-            st.warning("해당 이름을 찾을 수 없습니다.")
+            st.warning("Position/Title 컬럼이 없거나 데이터가 없습니다.")
