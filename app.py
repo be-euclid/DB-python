@@ -3,6 +3,20 @@ import pandas as pd
 import re
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib
+import platform
+
+# 한글 폰트 설정 함수
+def set_korean_font():
+    if platform.system() == 'Windows':
+        matplotlib.rc('font', family='Malgun Gothic')
+    elif platform.system() == 'Darwin':  # macOS
+        matplotlib.rc('font', family='AppleGothic')
+    else:  # Linux/Streamlit Cloud
+        matplotlib.rc('font', family='NanumGothic')
+    matplotlib.rcParams['axes.unicode_minus'] = False
+
+set_korean_font()
 
 @st.cache_data
 def load_all_data(uploaded_file):
@@ -99,6 +113,18 @@ def get_party_counts(df):
     counts = party_data.value_counts()
     return counts
 
+def get_party_counts_and_col(df):
+    party_cols = [col for col in df.columns if 'party membership' in str(col).lower()]
+    if not party_cols:
+        return None, None
+    party_col = party_cols[0]
+    # None, NaN, 빈 문자열, 공백 등은 모두 Non-Party로 대체
+    party_data = df[party_col].replace([None, np.nan, '', ' '], 'Non-Party')
+    party_data = party_data.fillna('Non-Party')
+    party_data = party_data.apply(lambda x: 'Non-Party' if str(x).strip() == '' else x)
+    counts = party_data.value_counts()
+    return counts, party_col
+
 def pie_chart_with_counts(counts, title, total):
     labels = [f"{idx} ({cnt})" for idx, cnt in zip(counts.index, counts.values)]
     def autopct_format(pct):
@@ -116,13 +142,36 @@ def pie_chart_with_counts(counts, title, total):
     plt.title(title, fontsize=13)
     return fig
 
-st.title("DB 검색 및 통계 대시보드")
-
 uploaded_file = st.file_uploader("엑셀 파일(.xlsx) 업로드", type="xlsx")
 if uploaded_file:
     df_all = load_all_data(uploaded_file)
     menu = st.sidebar.radio("메뉴 선택", ["이름 검색", "연도별 직위 분포", "연도별 Party Membership 분포"])
-    if menu == "이름 검색":
+    if menu == "연도별 Party Membership 분포":
+        years = sorted(df_all['Year(sheet)'].unique())
+        selected_year = st.selectbox("연도를 선택하세요", years, key="party_year")
+        year_df = df_all[df_all['Year(sheet)'] == selected_year]
+        counts, party_col = get_party_counts_and_col(year_df)
+        if counts is not None and not counts.empty:
+            st.subheader(f"{selected_year}년 Party Membership별 인원 분포")
+            party_df = counts.rename('인원수').reset_index().rename(columns={'index': 'Party Membership'})
+            # Party Membership 항목 선택
+            selected_party = st.radio("Party Membership을 선택하세요", party_df['Party Membership'])
+            st.dataframe(party_df)
+            # 선택된 Party Membership을 가진 사람 목록 출력
+            filtered_df = year_df.copy()
+            filtered_df[party_col] = filtered_df[party_col].replace([None, np.nan, '', ' '], 'Non-Party')
+            filtered_df[party_col] = filtered_df[party_col].fillna('Non-Party')
+            filtered_df[party_col] = filtered_df[party_col].apply(lambda x: 'Non-Party' if str(x).strip() == '' else x)
+            result = filtered_df[filtered_df[party_col] == selected_party]
+            if not result.empty:
+                result = reorder_columns(result)
+                st.success(f"{selected_party} Party Membership을 가진 인물 목록 ({len(result)}명):")
+                st.dataframe(result)
+            else:
+                st.warning("해당 Party Membership을 가진 인물이 없습니다.")
+        else:
+            st.warning("Party Membership 컬럼이 없거나 데이터가 없습니다.")
+    elif menu == "이름 검색":
         name_input = st.text_input("이름을 입력하세요(예: Nemchinov Vasily Sergeevich)")
         hide_none = st.checkbox("None/빈값 컬럼 숨기기")
         if name_input:
@@ -148,16 +197,3 @@ if uploaded_file:
             st.dataframe(counts.rename('인원수'))
         else:
             st.warning("Position/Title 컬럼이 없거나 데이터가 없습니다.")
-    elif menu == "연도별 Party Membership 분포":
-        years = sorted(df_all['Year(sheet)'].unique())
-        selected_year = st.selectbox("연도를 선택하세요", years, key="party_year")
-        year_df = df_all[df_all['Year(sheet)'] == selected_year]
-        counts = get_party_counts(year_df)
-        if counts is not None and not counts.empty:
-            st.subheader(f"{selected_year}년 Party Membership별 인원 분포")
-            total = int(counts.sum())
-            fig = pie_chart_with_counts(counts, f"{selected_year}년 Party Membership 분포", total)
-            st.pyplot(fig)
-            st.dataframe(counts.rename('인원수'))
-        else:
-            st.warning("Party Membership 컬럼이 없거나 데이터가 없습니다.")
