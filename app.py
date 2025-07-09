@@ -128,13 +128,20 @@ def normalize_party(x):
     return str(x).strip()
 
 def get_party_counts_and_col(df):
-    party_cols = [col for col in df.columns if 'party membership' in str(col).lower()]
+    # 이름 컬럼 찾기
+    name_cols = [col for col in df.columns if 'name' in str(col).lower()]
+    if not name_cols:
+        return None, None, None
+    name_col = name_cols[0]
+    # 이름이 None/빈값/NaN인 행은 제외
+    filtered_df = df[df[name_col].notna() & (df[name_col].astype(str).str.strip() != '')]
+    party_cols = [col for col in filtered_df.columns if 'party membership' in str(col).lower()]
     if not party_cols:
-        return None, None
+        return None, None, None
     party_col = party_cols[0]
-    party_data = df[party_col].apply(normalize_party)
+    party_data = filtered_df[party_col].apply(normalize_party)
     counts = party_data.value_counts()
-    return counts, party_col, party_data
+    return counts, party_col, party_data, filtered_df
 
 def pie_chart_with_counts(counts, title, total):
     labels = [f"{idx} ({cnt})" for idx, cnt in zip(counts.index, counts.values)]
@@ -162,38 +169,37 @@ if uploaded_file:
         selected_year = st.selectbox("연도를 선택하세요", years, key="party_year")
         year_df = df_all[df_all['Year(sheet)'] == selected_year]
         hide_nonparty = st.checkbox("'Non-Party' (None/공백 포함) 숨기기")
-        counts, party_col, party_data = get_party_counts_and_col(year_df)
+        counts, party_col, party_data, filtered_df = get_party_counts_and_col(year_df)
         if counts is not None and not counts.empty:
             st.subheader(f"{selected_year}년 Party Membership별 인원 분포")
             party_df = counts.rename('인원수').reset_index().rename(columns={'index': 'Party Membership'})
             # 'Non-Party' 숨기기
             if hide_nonparty:
                 party_df = party_df[party_df['Party Membership'].str.lower() != 'non-party']
-            # 맨 아래에 All 행 추가
-            total = party_df['인원수'].sum()
-            party_df = pd.concat(
-                [party_df, pd.DataFrame([{'Party Membership': 'All', '인원수': total}])],
-                ignore_index=True
-            )
-            st.dataframe(party_df, use_container_width=True)
-            # All행을 제외한 Party Membership만 선택 가능
-            selectable = party_df[party_df['Party Membership'] != 'All']['Party Membership']
-            if not selectable.empty:
-                selected_party = st.radio("Party Membership을 선택하세요", selectable)
-                # 선택된 Party Membership을 가진 사람 목록 출력
-                filtered_df = year_df.copy()
-                filtered_df[party_col] = party_data  # 정규화된 값으로 대체
-                result = filtered_df[filtered_df[party_col].str.lower() == selected_party.strip().lower()]
-                if not result.empty:
-                    result = reorder_columns(result)
-                    st.success(f"{selected_party} Party Membership을 가진 인물 목록 ({len(result)}명):")
-                    st.dataframe(result)
+                # 맨 아래에 All 행 추가
+                total = party_df['인원수'].sum()
+                party_df = pd.concat(
+                    [party_df, pd.DataFrame([{'Party Membership': 'All', '인원수': total}])],
+                    ignore_index=True
+                    )
+                st.dataframe(party_df, use_container_width=True)
+                # All행을 제외한 Party Membership만 선택 가능
+                selectable = party_df[party_df['Party Membership'] != 'All']['Party Membership']
+                if not selectable.empty:
+                    selected_party = st.radio("Party Membership을 선택하세요", selectable)
+                    # 선택된 Party Membership을 가진 사람 목록 출력
+                    filtered_df[party_col] = party_data  # 정규화된 값으로 대체
+                    result = filtered_df[filtered_df[party_col].str.lower() == selected_party.strip().lower()]
+                    if not result.empty:
+                        result = reorder_columns(result)
+                        st.success(f"{selected_party} Party Membership을 가진 인물 목록 ({len(result)}명):")
+                        st.dataframe(result)
+                    else:
+                        st.warning("해당 Party Membership을 가진 인물이 없습니다.")
                 else:
-                    st.warning("해당 Party Membership을 가진 인물이 없습니다.")
+                    st.warning("표시할 Party Membership이 없습니다.")
             else:
-                st.warning("표시할 Party Membership이 없습니다.")
-        else:
-            st.warning("Party Membership 컬럼이 없거나 데이터가 없습니다.")
+                st.warning("Party Membership 컬럼이 없거나 데이터가 없습니다.")
                 
     elif menu == "이름 검색":
         name_input = st.text_input("이름을 입력하세요(예: Nemchinov Vasily Sergeevich)")
