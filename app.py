@@ -57,15 +57,24 @@ def match_names(df, name_input):
     if not name_cols:
         return pd.DataFrame()
     name_col = name_cols[0]
+
     def is_match(row_name):
-        row_name_norm = normalize_name(str(row_name))
-        row_initials_norm = normalize_name(name_to_initials(str(row_name)))
+        row_name_str = str(row_name)
+        row_name_norm = normalize_name(row_name_str)
+        row_initials_norm = normalize_name(name_to_initials(row_name_str))
+        # 성만 입력한 경우: 입력값이 row_name의 첫 단어(성)와 일치
+        row_lastname = row_name_str.strip().split()[0].lower() if row_name_str.strip() else ''
+        # 입력값이 성만일 때(공백 없음), row_lastname과 비교
+        if ' ' not in name_input.strip():
+            return name_input_norm == row_lastname
+        # 전체 이름/이니셜 매칭
         return (
             name_input_norm == row_name_norm or
             initials_input_norm == row_name_norm or
             name_input_norm == row_initials_norm or
             initials_input_norm == row_initials_norm
         )
+
     mask = df[name_col].apply(is_match)
     return df[mask]
 
